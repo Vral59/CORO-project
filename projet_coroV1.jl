@@ -36,6 +36,7 @@ end
 Print the result of the problem.
 """
 function print_Result(lengths,lambda,patterns,n)
+    error = 0.0001
     cpt = 0
     println("RESULTS :")
     lambda = value.(lambda)
@@ -44,6 +45,11 @@ function print_Result(lengths,lambda,patterns,n)
     println("Cut pattern : ",lengths)
     for j in 1:p
         res = ceil(Int,lambda[j])
+        low_res = floor(Int,lambda[j])
+        # We need to solve the float problem : 4.00000000001 = 4 but it will be rounded to 5
+        if low_res< lambda[j] && low_res+error > lambda[j]
+            res = low_res
+        end
         if res != 0
             cpt += res
             print("We use ", res, " bar(s) with that pattern : {")
@@ -73,15 +79,14 @@ function cutting_stock()
     demand = data[:, "demand"]
 
     # total_length is the length of (raw) steel bars.
-    total_length = 100
+    total_length = 5600
 
     n = length(lengths)
     ncols = length(lengths)
     # Initialize the matrix patterns with the cutting patterns
     patterns = SparseArrays.spzeros(UInt16, n, ncols)
     for i in 1:n
-        patterns[i, i] =
-            min(floor(Int, total_length / lengths[i]), round(Int, demand[i]))
+        patterns[i, i] = floor(Int, total_length / lengths[i])
     end
 
     iter = 0
