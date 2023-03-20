@@ -4,15 +4,17 @@ using JuMP, LinearAlgebra, GLPK, CSV, DataFrames, SparseArrays
 Solves the Auxilliary Problem (AP).
 Returns the optimal solution x and the reduced cost RC.
 """
-function solve_AP(pi::Vector{Float64}, total_length::Int, lengths::Vector{Int})
+function solve_AP(pi::Vector{Float64}, total_length::Int, lengths::Vector{Int},demand)
     n = length(lengths)
     AP = Model(GLPK.Optimizer)
     @variable(AP, x[1:n] >= 0, Int)
     @constraint(AP, constraint_AP, sum(lengths[i] * x[i] for i in 1:n) <= total_length)
     @objective(AP, Max, sum(pi[i] * x[i] for i in 1:n))
     optimize!(AP)
+    println(constraint_AP)
     x = value.(x)
     RC = 1 - objective_value(AP)
+    println("obj = ", objective_value(AP))
     return x, RC
 end
 
@@ -22,11 +24,13 @@ Returns the optimal dual variables pi and lambda.
 """
 function solve_RMP(patterns, demand)
     p = size(patterns, 2)
+    n = size(patterns,1)
     RMP = Model(GLPK.Optimizer)
     @variable(RMP, lambda[1:p] >= 0)
-    @constraint(RMP, constraint_RMP, patterns * lambda .>= demand)
+    @constraint(RMP, constraint_RMP[j=1:n], sum(patterns[j,i] * lambda[i] for i in 1:p) .>= demand[j])
     @objective(RMP, Min, sum(lambda[j] for j in 1:p))
     optimize!(RMP)
+    println(constraint_RMP)
     pi = dual.(constraint_RMP)
     lambda = value.(lambda)
     return pi, lambda
@@ -44,12 +48,7 @@ function print_Result(lengths,lambda,patterns,n)
     println("----------------------------------------------------")
     println("Cut pattern : ",lengths)
     for j in 1:p
-        res = ceil(Int,lambda[j])
-        low_res = floor(Int,lambda[j])
-        # We need to solve the float problem : 4.00000000001 = 4 but it will be rounded to 5
-        if low_res< lambda[j] && low_res+error > lambda[j]
-            res = low_res
-        end
+        res = ceil(Int, lambda[j]-error)
         if res != 0
             cpt += res
             print("We use ", res, " bar(s) with that pattern : {")
@@ -86,7 +85,7 @@ function cutting_stock()
     # Initialize the matrix patterns with the cutting patterns
     patterns = SparseArrays.spzeros(UInt16, n, ncols)
     for i in 1:n
-        patterns[i, i] = floor(Int, total_length / lengths[i])
+        patterns[i, i] = min(floor(Int, total_length / lengths[i]), round(Int, demand[i]))
     end
 
     iter = 0
@@ -99,9 +98,10 @@ function cutting_stock()
         # Solve the Restricted Master Problem (RMP)
         pi, lambda = solve_RMP(patterns, demand)
         println("lambda = ", lambda)
+        println("pi = ", pi)
 
         # Solve the Auxilliary Problem (AP)
-        x, RC = solve_AP(pi, total_length, lengths)
+        x, RC = solve_AP(pi, total_length, lengths,demand)
         # Print the solution for this iteration
         println("x = ", x)
         println("RC = ",RC)
@@ -120,16 +120,4 @@ end
 
 
 cutting_stock()
-
-
-# TODO :
-"""
-- Adapter le code pour qu'il colle à l'input
-- Vérifier les conditions de bords et d'arrondie
-"""
-
-# DONE :
-"""
-- Modifier les inputs
-- Modifier le nom des variables
-"""
+    
