@@ -1,5 +1,7 @@
 # Project Cutting stock problem
 
+Project made by JINZhao2000 and I
+
 ## Environnement
 julia version 1.8.5
 libraries:
